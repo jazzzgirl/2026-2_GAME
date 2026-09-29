@@ -284,7 +284,7 @@ const store = {
 };
 const S = {
   view: 'home', project: null, mode: null,
-  students: [], me: store.get('xr_me'), sid: store.get('xr_sid'), pick: null, status: null, target: null,
+  gate: null, students: [], me: store.get('xr_me'), sid: store.get('xr_sid'), pick: null, status: null, target: null,
   form: null, pw: store.get('xr_pw'), admin: null, tab: 'result', sort: 'name',
   pform: null, urlDraft: null, detail: null
 };
@@ -314,10 +314,17 @@ async function api(action, payload){
   if (!apiReady()) throw new Error('서버 주소가 설정되지 않았습니다. index.html의 API_URL을 입력하세요.');
   let res;
   try {
-    res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(Object.assign({ action, project: S.project }, payload || {})) });
+    res = await fetch(API_URL, { method: 'POST', body: JSON.stringify(Object.assign({ action, project: S.project, gate: S.gate }, payload || {})) });
   } catch(e){ throw new Error('서버에 연결하지 못했습니다. 인터넷 연결을 확인하세요.'); }
   const data = await res.json().catch(() => ({ ok: false, error: '서버 응답을 읽지 못했습니다.' }));
-  if (!data.ok) throw new Error(data.error || '요청을 처리하지 못했습니다.');
+  if (!data.ok){
+    if (data.code === 'gate' && action !== 'enter'){
+      // 입장 비밀번호가 바뀌었거나 평가가 종료됨 → 처음 화면으로
+      store.set('xr_gate_' + S.project, null); S.gate = null;
+      setTimeout(() => go('home'), 0);
+    }
+    throw new Error(data.error || '요청을 처리하지 못했습니다.');
+  }
   return data;
 }
 function go(view, extra){ Object.assign(S, extra || {}); S.view = view; render(); window.scrollTo(0, 0); }
@@ -359,6 +366,16 @@ function vHub(){
       <button type="button" class="role admin" data-act="role" data-role="admin"><strong>교수 전용</strong><span>배포 주소 입력, 교수 평가, 결과 확인과 다운로드</span></button>
     </div>
     <p class="weights">최종 점수는 교수 평가 ${w.prof*100}%, 상호평가 ${w.peer*100}%, 자기평가 ${w.self*100}%로 반영됩니다.</p>
+  </section>`;
+}
+
+/* ---------- 화면: 프로젝트 입장 ---------- */
+function vGate(){
+  const P = proj();
+  return topbar(P.title, 'home') + `<section class="page">
+    <div class="login"><h2>${esc(P.title)}</h2><p class="muted">수업에서 안내받은 프로젝트 비밀번호를 입력하세요.</p>
+      <label for="gate">프로젝트 비밀번호</label><input id="gate" type="password" autocomplete="off">
+      <button type="button" class="btn primary" data-act="enter">입장</button></div>
   </section>`;
 }
 
@@ -616,11 +633,22 @@ async function afterMe(){
 function render(){
   const v = {
     home: vHome, hub: vHub, who: vWho, peerList: vPeerList, peerForm: vPeerForm,
-    selfForm: vSelfForm, login: vLogin, admin: vAdmin, auth: vAuth
+    selfForm: vSelfForm, login: vLogin, admin: vAdmin, auth: vAuth, gate: vGate
   }[S.view] || vHome;
   $app.innerHTML = v();
   if (S.view === 'login'){ const pw = document.getElementById('pw'); pw && pw.focus(); }
+  if (S.view === 'gate'){ const el = document.getElementById('gate'); el && el.focus(); }
   if (S.view === 'auth'){ const el = document.getElementById('sid'); el && el.focus(); }
+}
+
+async function doEnter(){
+  const g = document.getElementById('gate').value;
+  if (!g) return toast('프로젝트 비밀번호를 입력하세요.', 'err');
+  S.gate = g;
+  const ok = await withBusy(() => api('enter'));
+  if (!ok){ S.gate = null; const el = document.getElementById('gate'); if (el){ el.value = ''; el.focus(); } return; }
+  store.set('xr_gate_' + S.project, g);
+  go('hub');
 }
 
 async function doStudentLogin(){
@@ -647,8 +675,18 @@ const actions = {
   async project(el){
     const p = PROJECTS.find(x => x.id === el.dataset.id);
     if (!p.open) return toast(`${p.title} 평가는 아직 열리지 않았습니다.`);
-    go('hub', { project: p.id, students: [], status: null, admin: null, pform: null, urlDraft: null, detail: null });
+    const reset = { project: p.id, gate: null, students: [], status: null, admin: null, pform: null, urlDraft: null, detail: null };
+    Object.assign(S, reset);
+    const saved = store.get('xr_gate_' + p.id);
+    if (saved){
+      S.gate = saved;
+      const ok = await withBusy(() => api('enter'));
+      if (ok) return go('hub');
+      S.gate = null; store.set('xr_gate_' + p.id, null);
+    }
+    go('gate');
   },
+  enter(){ doEnter(); },
   back(el){ go(el.dataset.to, { detail: null }); },
   async role(el){
     const r = el.dataset.role;
@@ -754,6 +792,7 @@ document.addEventListener('change', ev => {
 document.addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && ev.target.id === 'pw') doLogin();
   if (ev.key === 'Enter' && ev.target.id === 'sid') doStudentLogin();
+  if (ev.key === 'Enter' && ev.target.id === 'gate') doEnter();
   if (ev.key === 'Escape' && S.detail){ S.detail = null; render(); }
 });
 
