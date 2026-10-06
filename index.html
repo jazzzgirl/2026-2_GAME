@@ -50,6 +50,21 @@ a{color:var(--accent)}
 .stage.is-open .ss{color:var(--accent);font-weight:600}
 .stage.is-open:hover{transform:translateY(-2px)}
 .stage.is-soon{border-style:dashed;background:var(--bg);cursor:default}
+.stage.is-closed{border-style:solid;cursor:pointer}
+.stage.is-closed .ss{color:var(--muted)}
+.fbentry{margin-top:40px;display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;background:var(--surface);border:1.5px solid var(--line);border-radius:18px;padding:20px 22px}
+.fbentry strong{display:block;font-size:1.15rem}
+.fbentry span{color:var(--muted);font-size:.95rem}
+.fbhead{margin-bottom:8px}
+.fbhead h2{font-family:var(--display);font-weight:400;font-size:2rem}
+.fbhead p{margin:4px 0 0;color:var(--muted)}
+.fbgroup{margin-top:28px}
+.fbgroup h3{display:flex;align-items:center;gap:10px;font-size:1.1rem;margin-bottom:12px}
+.fblist{list-style:none;margin:0;padding:0;display:grid;gap:10px}
+.fblist li{background:var(--surface);border:1.5px solid var(--line);border-left:4px solid var(--accent);border-radius:12px;padding:12px 16px;white-space:pre-wrap;word-break:keep-all;overflow-wrap:anywhere;line-height:1.65}
+.fbgroup.improve .fblist li{border-left-color:var(--warn)}
+.empty{color:var(--muted);background:var(--surface);border:1.5px dashed var(--line);border-radius:12px;padding:16px;margin:0}
+.tab[disabled]{opacity:.45;cursor:not-allowed}
 .setup-note{margin-top:36px;padding:14px 16px;border-radius:12px;background:var(--warn-soft);color:var(--warn);font-size:.95rem}
 @media (max-width:720px){
   .home{padding-top:36px}
@@ -235,7 +250,7 @@ tbody tr.click:hover td{background:var(--accent-soft)}
 /* =========================================================
    설정: Apps Script 웹 앱 배포 후 받은 URL을 아래에 붙여 넣으세요.
    ========================================================= */
-const API_URL = 'https://script.google.com/macros/s/AKfycbzfUkP90LsFPeCkCoWH_I25bzJPmTXae81TCCJv8vf_xH7pOI8tv1vU8xvCxKT73JaT/exec';
+const API_URL = 'PASTE_YOUR_APPS_SCRIPT_URL_HERE';
 
 const COURSE = { title: '몰입형 XR 프로젝트', term: '2026학년도 2학기 프로젝트 평가', org: '신라대학교 컴퓨터공학과' };
 
@@ -284,7 +299,7 @@ const store = {
 };
 const S = {
   view: 'home', project: null, mode: null,
-  gate: null, students: [], me: store.get('xr_me'), sid: store.get('xr_sid'), pick: null, status: null, target: null,
+  gate: null, pstatus: null, fb: null, fbPick: null, students: [], me: store.get('xr_me'), sid: store.get('xr_sid'), pick: null, status: null, target: null,
   form: null, pw: store.get('xr_pw'), admin: null, tab: 'result', sort: 'name',
   pform: null, urlDraft: null, detail: null
 };
@@ -336,11 +351,18 @@ function vHome(){
     <h1 class="course">몰입형<br>XR 프로젝트</h1>
     <p class="term">${esc(COURSE.term)}. 평가할 프로젝트를 고르세요.</p>
     <ol class="stages">
-      ${PROJECTS.map(p => `<li><button type="button" class="stage ${p.open ? 'is-open' : 'is-soon'}" data-act="project" data-id="${p.id}">
+      ${PROJECTS.map(p => {
+        const st = S.pstatus && S.pstatus[p.id];
+        const closed = p.open && st && !st.evalOpen;
+        const cls = !p.open ? 'is-soon' : closed ? 'is-closed' : 'is-open';
+        const sub = !p.open ? '준비 중' : closed ? '평가 종료' : '평가 진행 중';
+        return `<li><button type="button" class="stage ${cls}" data-act="project" data-id="${p.id}">
         <span class="rn" aria-hidden="true">${p.roman}</span>
-        <span class="txt"><span class="st">${esc(p.title)}</span><span class="ss">${p.open ? '평가 진행 중' : '준비 중'}</span></span>
-      </button></li>`).join('')}
+        <span class="txt"><span class="st">${esc(p.title)}</span><span class="ss">${sub}</span></span>
+      </button></li>`; }).join('')}
     </ol>
+    <div class="fbentry"><div><strong>내 피드백 확인</strong><span>동료들이 남긴 상호평가 피드백을 작성자 이름 없이 모아 봅니다.</span></div>
+      <button type="button" class="btn primary" data-act="fb-start">피드백 보기</button></div>
     ${apiReady() ? '' : '<p class="setup-note">서버 주소가 아직 설정되지 않았습니다. index.html 상단의 API_URL에 Apps Script 웹 앱 주소를 넣어 주세요.</p>'}
   </main>`;
 }
@@ -373,10 +395,66 @@ function vHub(){
 function vGate(){
   const P = proj();
   return topbar(P.title, 'home') + `<section class="page">
-    <div class="login"><h2>${esc(P.title)}</h2><p class="muted">수업에서 안내받은 프로젝트 비밀번호를 입력하세요.</p>
+    <div class="login"><h2>${esc(P.title)}</h2>${S.pstatus && S.pstatus[P.id] && !S.pstatus[P.id].evalOpen
+      ? '<p class="note" style="margin-top:8px">평가가 종료되었습니다. 동료 피드백은 처음 화면의 "내 피드백 확인"에서 볼 수 있습니다.</p>'
+      : '<p class="muted">수업에서 안내받은 프로젝트 비밀번호를 입력하세요.</p>'}
       <label for="gate">프로젝트 비밀번호</label><input id="gate" type="password" autocomplete="off">
       <button type="button" class="btn primary" data-act="enter">입장</button></div>
   </section>`;
+}
+
+/* ---------- 화면: 피드백 확인 ---------- */
+function vFbWho(){
+  return topbar('내 피드백 확인', 'home') + `<section class="page">
+    <h2>본인 이름을 선택하세요</h2>
+    <p class="muted">이름을 누른 뒤 본인 학번을 입력하면 피드백을 볼 수 있습니다.</p>
+    <div class="names">${S.students.map(s => `<button type="button" class="name" data-act="fb-me" data-name="${esc(s.name)}">${esc(s.name)}</button>`).join('')}</div>
+  </section>`;
+}
+function vFbAuth(){
+  return topbar('내 피드백 확인', 'fbWho') + `<section class="page">
+    <div class="login"><h2>${esc(S.fbPick)}</h2><p class="muted">본인 확인을 위해 학번을 입력하세요.</p>
+      <label for="fbsid">학번</label><input id="fbsid" type="password" inputmode="numeric" autocomplete="off" maxlength="20">
+      <button type="button" class="btn primary" data-act="fb-login">확인</button></div>
+  </section>`;
+}
+function vFeedback(){
+  const F = S.fb, P = PROJECTS.find(p => p.id === F.cur), d = F.data[F.cur];
+  const labels = (P && P.rubric && P.rubric.peerText) || ['좋았던 점', '개선하면 좋을 점'];
+  const group = (cls, title, list) => `<section class="fbgroup ${cls}"><h3>${esc(title)} <span class="chip">${list.length}건</span></h3>
+    ${list.length ? `<ul class="fblist">${list.map(t => `<li>${esc(t)}</li>`).join('')}</ul>` : '<p class="empty">작성된 피드백이 없습니다.</p>'}</section>`;
+  let body;
+  if (!F.open.length) body = '<p class="empty">아직 공개된 피드백이 없습니다.</p>';
+  else if (!d) body = '<p class="muted">프로젝트를 선택하세요.</p>';
+  else body = `<div class="fbhead"><h2>${esc(P.title)}</h2>
+      <p>동료 ${d.count}명이 평가했습니다. 작성자는 공개되지 않으며, 표시 순서는 무작위입니다.</p></div>
+      ${group('good', labels[0], d.good)}${group('improve', labels[1], d.improve)}`;
+  return topbar('내 피드백 확인', 'home', '<button type="button" class="btn sm" data-act="fb-logout">로그아웃</button>') + `<section class="page">
+    <div class="who" style="margin-bottom:18px"><strong>${esc(F.name)}</strong> 님의 피드백</div>
+    <nav class="tabs" role="tablist">${PROJECTS.map(p => { const on = F.open.includes(p.id); return `<button type="button" class="tab" role="tab" aria-selected="${F.cur === p.id}" ${on ? '' : 'disabled'} data-act="fb-tab" data-id="${p.id}">프로젝트 ${p.roman}${on ? '' : ' (미공개)'}</button>`; }).join('')}</nav>
+    ${body}
+  </section>`;
+}
+async function loadFeedback(pid){
+  const d = await api('myFeedback', { project: pid, name: S.fb.name, sid: S.fb.sid });
+  S.fb.data[pid] = d.feedback;
+}
+async function doFbLogin(){
+  const sid = document.getElementById('fbsid').value.trim();
+  if (!sid) return toast('학번을 입력하세요.', 'err');
+  let open = [];
+  const ok = await withBusy(async () => {
+    const d = await api('feedbackLogin', { name: S.fbPick, sid });
+    open = d.open.filter(id => PROJECTS.some(p => p.id === id));
+    S.fb = { name: S.fbPick, sid, open, cur: open[0] || null, data: {} };
+    if (S.fb.cur) await loadFeedback(S.fb.cur);
+  });
+  if (!ok){ S.fb = null; const el = document.getElementById('fbsid'); if (el){ el.value = ''; el.focus(); } return; }
+  go('feedback');
+}
+async function loadStatus(){
+  if (!apiReady()) return;
+  try { const d = await api('projectStatus'); S.pstatus = d.status; if (S.view === 'home') render(); } catch(e){}
 }
 
 /* ---------- 화면: 이름 선택 ---------- */
@@ -633,10 +711,11 @@ async function afterMe(){
 function render(){
   const v = {
     home: vHome, hub: vHub, who: vWho, peerList: vPeerList, peerForm: vPeerForm,
-    selfForm: vSelfForm, login: vLogin, admin: vAdmin, auth: vAuth, gate: vGate
+    selfForm: vSelfForm, login: vLogin, admin: vAdmin, auth: vAuth, gate: vGate, fbWho: vFbWho, fbAuth: vFbAuth, feedback: vFeedback
   }[S.view] || vHome;
   $app.innerHTML = v();
   if (S.view === 'login'){ const pw = document.getElementById('pw'); pw && pw.focus(); }
+  if (S.view === 'fbAuth'){ const el = document.getElementById('fbsid'); el && el.focus(); }
   if (S.view === 'gate'){ const el = document.getElementById('gate'); el && el.focus(); }
   if (S.view === 'auth'){ const el = document.getElementById('sid'); el && el.focus(); }
 }
@@ -687,6 +766,22 @@ const actions = {
     go('gate');
   },
   enter(){ doEnter(); },
+  async 'fb-start'(){
+    S.project = null; S.gate = null;
+    if (S.fb) return go('feedback');
+    const ok = await withBusy(async () => { const d = await api('fbRoster'); S.students = d.students; });
+    if (ok) go('fbWho');
+  },
+  'fb-me'(el){ go('fbAuth', { fbPick: el.dataset.name }); },
+  'fb-login'(){ doFbLogin(); },
+  'fb-logout'(){ S.fb = null; go('home'); },
+  async 'fb-tab'(el){
+    const id = el.dataset.id;
+    if (!S.fb.open.includes(id)) return;
+    S.fb.cur = id;
+    if (!S.fb.data[id]){ const ok = await withBusy(() => loadFeedback(id)); if (!ok) return; }
+    render();
+  },
   back(el){ go(el.dataset.to, { detail: null }); },
   async role(el){
     const r = el.dataset.role;
@@ -793,10 +888,12 @@ document.addEventListener('keydown', ev => {
   if (ev.key === 'Enter' && ev.target.id === 'pw') doLogin();
   if (ev.key === 'Enter' && ev.target.id === 'sid') doStudentLogin();
   if (ev.key === 'Enter' && ev.target.id === 'gate') doEnter();
+  if (ev.key === 'Enter' && ev.target.id === 'fbsid') doFbLogin();
   if (ev.key === 'Escape' && S.detail){ S.detail = null; render(); }
 });
 
 render();
+loadStatus();
 </script>
 </body>
 </html>
