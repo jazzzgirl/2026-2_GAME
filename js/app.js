@@ -39,15 +39,66 @@ const PROJECTS = [
       profMax: 100, peerMax: 25, selfMax: 25,
       weights: { prof: 0.7, peer: 0.2, self: 0.1 }
   }},
-  { id: 'p2', roman: 'II', title: '프로젝트 II', open: false },
+  { id: 'p2', roman: 'II', title: '게임 프로젝트 II', open: true, rubric: {
+      // levels: [최솟값, 최댓값, 기준] — 상/중/하 구간. 슬라이더 색상과 안내 문구에 쓰입니다.
+      prof: [
+        { label: '게임의 재미', max: 25, levels: {
+            high: [20, 25, '핵심 재미가 분명하고, 진행할수록 변화가 있어 계속 플레이하고 싶음'],
+            mid:  [12, 19, '재미 요소는 있으나 단조롭거나 밸런스가 어색함'],
+            low:  [0, 11, '재미 요소가 약하거나 게임으로 성립하지 않음'] } },
+        { label: '완성도 및 레벨 구성', max: 25, levels: {
+            high: [20, 25, '타이틀부터 다시하기까지 끊김 없고 치명적 버그가 없음. 레벨(단계)이 있고 난이도가 적절히 올라감'],
+            mid:  [12, 19, '흐름 일부가 빠졌거나 사소한 버그가 있음. 레벨은 있으나 난이도 변화가 약함'],
+            low:  [0, 11, '진행 불가 버그가 있거나, 레벨 구분 없이 같은 내용이 반복됨'] } },
+        { label: '스토리 구성 및 전달', max: 15, levels: {
+            high: [12, 15, '스토리가 게임 안에서 전달되고, 스토리의 목표가 플레이 행동과 자연스럽게 이어짐'],
+            mid:  [7, 11, '스토리는 있으나 게임 안에서 약하게 전달되거나 플레이와 따로 놂'],
+            low:  [0, 6, '스토리가 기획서에만 있고 게임에서는 드러나지 않음'] } },
+        { label: '이미지·사운드', max: 15, levels: {
+            high: [12, 15, '이미지·배경음악·효과음이 모두 갖춰져 분위기와 스토리를 살림'],
+            mid:  [7, 11, '일부가 부족하거나 서로 어울리지 않음'],
+            low:  [0, 6, '기본 도형이 남아 있거나 사운드가 빠짐'] } },
+        { label: '기획서 일치 및 피드백 반영', max: 10, levels: {
+            high: [8, 10, '기획서대로 구현되었고, 바뀐 부분과 브리핑 피드백 반영 내용을 설명함'],
+            mid:  [4, 7, '기획서와 부분적으로만 일치함'],
+            low:  [0, 3, '기획서와 결과물이 크게 다름'] } },
+        { label: '발표 및 생성형 AI 활용 과정', max: 10, levels: {
+            high: [8, 10, 'AI 제안을 검증·수정한 과정이 구체적이고, 발표가 명확함'],
+            mid:  [4, 7, 'AI 활용 설명이 형식적이거나 발표 구성이 산만함'],
+            low:  [0, 3, 'AI 활용 과정 설명이 없음'] } }
+      ],
+      peer: [
+        '직접 플레이해 보니 재미있었고, 한 판 더 하고 싶었다',
+        '게임 안에서 스토리가 잘 전달되었고, 주인공의 목표와 상황이 플레이에 몰입하게 만들었다',
+        '타이틀부터 엔딩(또는 게임오버), 다시하기까지 끊김 없이 플레이되었고 치명적인 버그가 없었다',
+        '이미지와 사운드가 게임의 분위기와 스토리에 잘 어울렸다',
+        '기획 의도와 생성형 AI 활용 과정이 발표에서 이해하기 쉽게 설명되었다'
+      ],
+      peerText: ['가장 인상 깊었던 부분', '개선하면 더 좋을 것 같은 점'],
+      peerTextRequired: true,
+      selfScale: [
+        '내가 기획한 핵심 재미를 실제 게임에서 구현했다',
+        '기획한 스토리가 게임 안에서 전달되도록 구현했다',
+        '타이틀부터 다시하기까지 끊김 없이 완성했고, 치명적인 버그를 해결했다',
+        '플레이 테스트 의견을 반영해 게임을 개선했다',
+        '생성형 AI의 결과를 그대로 쓰지 않고 검증·수정하며 활용했다'
+      ],
+      selfText: [
+        '내 게임에서 가장 재미있는 순간은 언제이며, 그 재미를 만들기 위해 무엇을 했는가?',
+        '완성도 체크리스트 중 끝내 지키지 못한 항목과 그 이유는? (모두 지켰다면 가장 어려웠던 항목과 해결 방법)',
+        '프로젝트 I과 비교해 나아진 점은 무엇인가?',
+        '다음 프로젝트(프로젝트 III)에서 다르게 시도해 보고 싶은 것은?'
+      ],
+      profMax: 100, peerMax: 25, selfMax: 25,
+      weights: { prof: 0.7, peer: 0.2, self: 0.1 }
+  }},
   { id: 'p3', roman: 'III', title: '프로젝트 III', open: false }
 ];
 
 /* ---------- 상태 ---------- */
-const store = {
-  get(k){ try { return sessionStorage.getItem(k); } catch(e){ return null; } },
-  set(k,v){ try { v==null ? sessionStorage.removeItem(k) : sessionStorage.setItem(k,v); } catch(e){} }
-};
+// 비밀번호와 학번은 브라우저에 저장하지 않습니다. (공용 컴퓨터에서 다음 사람이 그대로 들어가는 것을 막기 위함)
+const store = { get(){ return null; }, set(){} };
+try { Object.keys(sessionStorage).filter(k => k.startsWith('xr_')).forEach(k => sessionStorage.removeItem(k)); } catch(e){}
 const S = {
   view: 'home', project: null, mode: null,
   gate: null, pstatus: null, fb: null, fbPick: null, students: [], me: store.get('xr_me'), sid: store.get('xr_sid'), pick: null, status: null, target: null,
@@ -106,7 +157,7 @@ function vHome(){
         const st = S.pstatus && S.pstatus[p.id];
         const closed = p.open && st && !st.evalOpen;
         const cls = !p.open ? 'is-soon' : closed ? 'is-closed' : 'is-open';
-        const sub = !p.open ? '준비 중' : closed ? '평가 종료' : '평가 진행 중';
+        const sub = !p.open ? '준비 중' : closed ? (st.feedbackOpen ? '평가 종료' : '준비 중') : '평가 진행 중';
         return `<li><button type="button" class="stage ${cls}" data-act="project" data-id="${p.id}">
         <span class="rn" aria-hidden="true">${p.roman}</span>
         <span class="txt"><span class="st">${esc(p.title)}</span><span class="ss">${sub}</span></span>
@@ -147,9 +198,11 @@ function vGate(){
   const P = proj();
   return topbar(P.title, 'home') + `<section class="page">
     <div class="login"><h2>${esc(P.title)}</h2>${S.pstatus && S.pstatus[P.id] && !S.pstatus[P.id].evalOpen
-      ? '<p class="note" style="margin-top:8px">평가가 종료되었습니다. 동료 피드백은 처음 화면의 "내 피드백 확인"에서 볼 수 있습니다.</p>'
+      ? (S.pstatus[P.id].feedbackOpen
+          ? '<p class="note" style="margin-top:8px">평가가 종료되었습니다. 동료 피드백은 처음 화면의 "내 피드백 확인"에서 볼 수 있습니다.</p>'
+          : '<p class="note" style="margin-top:8px">아직 평가가 열리지 않았습니다.</p>')
       : '<p class="muted">수업에서 안내받은 프로젝트 비밀번호를 입력하세요.</p>'}
-      <label for="gate">프로젝트 비밀번호</label><input id="gate" type="password" autocomplete="off">
+      <label for="gate">프로젝트 비밀번호</label><input id="gate" type="password" autocomplete="new-password" value="">
       <button type="button" class="btn primary" data-act="enter">입장</button></div>
   </section>`;
 }
@@ -165,7 +218,7 @@ function vFbWho(){
 function vFbAuth(){
   return topbar('내 피드백 확인', 'fbWho') + `<section class="page">
     <div class="login"><h2>${esc(S.fbPick)}</h2><p class="muted">본인 확인을 위해 학번을 입력하세요.</p>
-      <label for="fbsid">학번</label><input id="fbsid" type="password" inputmode="numeric" autocomplete="off" maxlength="20">
+      <label for="fbsid">학번</label><input id="fbsid" type="password" inputmode="numeric" autocomplete="new-password" maxlength="20" value="">
       <button type="button" class="btn primary" data-act="fb-login">확인</button></div>
   </section>`;
 }
@@ -227,7 +280,7 @@ function playLink(url, label){
 function vAuth(){
   return topbar(S.mode === 'peer' ? '상호평가' : '자기평가', 'who') + `<section class="page">
     <div class="login"><h2>${esc(S.pick)}</h2><p class="muted">본인 확인을 위해 학번을 입력하세요.</p>
-      <label for="sid">학번</label><input id="sid" type="password" inputmode="numeric" autocomplete="off" maxlength="20">
+      <label for="sid">학번</label><input id="sid" type="password" inputmode="numeric" autocomplete="new-password" maxlength="20" value="">
       <button type="button" class="btn primary" data-act="student-login">확인</button>
       <p style="margin:14px 0 0;text-align:center"><button type="button" class="link" data-act="change-me">다른 이름 선택</button></p></div>
   </section>`;
@@ -267,7 +320,7 @@ function vPeerForm(){
     ${again ? '<p class="note">이미 평가한 학생입니다. 다시 제출하면 이전 평가가 새 내용으로 바뀝니다.</p>' : ''}
     ${R.peer.map((q, i) => ratingGroup(i, q, S.form.scores[i])).join('')}
     <div class="total">합계 <b id="sum">${formSum()}</b> / 25</div>
-    <h3 class="sub">서술형 <small>(선택, 1~2개 작성)</small></h3>
+    <h3 class="sub">서술형 <small>${R.peerTextRequired ? '(모든 문항 필수, 작성자 이름은 공개되지 않습니다)' : '(선택, 1~2개 작성)'}</small></h3>
     ${R.peerText.map((q, i) => `<label class="ta"><span>${esc(q)}</span><textarea data-t="${i}" rows="3" maxlength="1000">${esc(S.form.texts[i])}</textarea></label>`).join('')}
     <button type="button" class="btn primary block" data-act="submit-peer">평가 제출</button>
   </section>`;
@@ -292,7 +345,7 @@ function vSelfForm(){
 function vLogin(){
   return topbar('교수 전용', 'hub') + `<section class="page">
     <div class="login"><h2>교수 로그인</h2><p class="muted">평가 결과는 교수만 볼 수 있습니다.</p>
-      <label for="pw">비밀번호</label><input id="pw" type="password" autocomplete="current-password">
+      <label for="pw">비밀번호</label><input id="pw" type="password" autocomplete="new-password" value="">
       <button type="button" class="btn primary" data-act="login">로그인</button></div>
   </section>`;
 }
@@ -317,8 +370,8 @@ function compute(){
 
 /* ---------- 화면: 교수 ---------- */
 function vAdmin(){
-  const tabs = [['result','결과'],['prof','교수 평가'],['urls','배포 주소'],['status','제출 현황']];
-  const body = { result: vResult, prof: vProf, urls: vUrls, status: vStatus }[S.tab]();
+  const tabs = [['result','결과'],['prof','교수 평가'],['urls','배포 주소'],['status','제출 현황'],['settings','공개 설정']];
+  const body = { result: vResult, prof: vProf, urls: vUrls, status: vStatus, settings: vSettings }[S.tab]();
   return topbar('교수 전용', 'hub', `<button type="button" class="btn sm" data-act="refresh">새로고침</button><button type="button" class="btn primary sm" data-act="download">엑셀 다운로드</button><button type="button" class="btn sm" data-act="logout">로그아웃</button>`)
     + `<section class="page wide">
       <nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button type="button" class="tab" role="tab" aria-selected="${S.tab === k}" data-act="tab" data-tab="${k}">${l}</button>`).join('')}</nav>
@@ -372,16 +425,95 @@ function vProf(){
     <div class="pform">
       <h3>${esc(f.name)}</h3>
       <p style="margin:0 0 8px">${playLink((D.students.find(s => s.name === f.name) || {}).url, '게임 열기')}</p>
-      ${R.prof.map((p, i) => `<div class="prow"><label for="pi${i}">${esc(p.label)}<small>0 ~ ${p.max}점</small></label>
-        <input id="pi${i}" type="number" inputmode="decimal" min="0" max="${p.max}" step="0.5" data-pi="${i}" value="${esc(f.scores[i])}"></div>`).join('')}
+      ${R.prof.map((p, i) => sliderRow(p, i, f.scores[i])).join('')}
       <div class="total">합계 <b id="psum">${r2(total)}</b> / 100</div>
       <label class="ta"><span>코멘트 (선택, 학생에게 공개되지 않음)</span><textarea id="pcomment" rows="3" maxlength="2000">${esc(f.comment)}</textarea></label>
       <div class="pactions"><button type="button" class="btn" data-act="save-prof">저장</button><button type="button" class="btn primary" data-act="save-prof" data-next="1">저장하고 다음 학생</button></div>
     </div></div>`;
 }
+/* ---------- 교수 평가 슬라이더 ---------- */
+// 상/중/하 구간: 항목에 levels가 없으면 배점의 80% / 48% 기준으로 나눕니다.
+function levelsOf(item){
+  if (item.levels) return item.levels;
+  const m = item.max, hi = Math.ceil(m * 0.8), mi = Math.ceil(m * 0.48);
+  return { high: [hi, m, ''], mid: [mi, hi - 1, ''], low: [0, mi - 1, ''] };
+}
+const LEVEL_NAME = { high: '상', mid: '중', low: '하' };
+function levelFor(item, v){
+  if (v === '' || v == null || !isFinite(Number(v))) return null;
+  const L = levelsOf(item), x = Number(v);
+  return x >= L.high[0] ? 'high' : x >= L.mid[0] ? 'mid' : 'low';
+}
+function sliderState(item, v){
+  const lv = levelFor(item, v);
+  const pct = lv ? Number(v) / item.max * 100 : 0;
+  const L = levelsOf(item);
+  return {
+    lv, pct,
+    badge: lv ? `${LEVEL_NAME[lv]} (${L[lv][0]}~${L[lv][1]})` : '미입력',
+    desc: lv ? L[lv][2] : '슬라이더를 움직여 점수를 정하세요.'
+  };
+}
+function sliderRow(item, i, v){
+  const st = sliderState(item, v);
+  return `<div class="srow ${st.lv ? 'lv-' + st.lv : 'unset'}" id="srow${i}" style="--pct:${st.pct}%">
+    <div class="shead"><label for="pi${i}">${esc(item.label)}</label>
+      <span class="sval"><b id="pv${i}">${st.lv ? Number(v) : '-'}</b> / ${item.max}</span></div>
+    <input id="pi${i}" class="slider" type="range" min="0" max="${item.max}" step="1" data-pi="${i}" value="${st.lv ? Number(v) : 0}" aria-valuetext="${st.lv ? Number(v) + '점' : '미입력'}">
+    <div class="sfoot"><span class="lvchip" id="pc${i}">${esc(st.badge)}</span><span class="sdesc" id="pd${i}">${esc(st.desc)}</span></div>
+  </div>`;
+}
+function updateSlider(i){
+  const item = proj().rubric.prof[i], v = S.pform.scores[i], st = sliderState(item, v);
+  const row = document.getElementById('srow' + i);
+  if (!row) return;
+  row.className = 'srow ' + (st.lv ? 'lv-' + st.lv : 'unset');
+  row.style.setProperty('--pct', st.pct + '%');
+  document.getElementById('pv' + i).textContent = st.lv ? Number(v) : '-';
+  document.getElementById('pc' + i).textContent = st.badge;
+  document.getElementById('pd' + i).textContent = st.desc;
+  document.getElementById('pi' + i).setAttribute('aria-valuetext', st.lv ? Number(v) + '점' : '미입력');
+}
+
 function selectProf(name){
   const p = S.admin.prof.find(x => x.name === name);
   S.pform = { name, scores: p ? p.scores.map(String) : proj().rubric.prof.map(() => ''), comment: p ? p.comment : '' };
+}
+
+/* ---------- 교수: 공개 설정 ---------- */
+function vSettings(){
+  const st = S.admin.settings || { gate: '', feedbackOpen: false };
+  const open = !!st.gate;
+  return `<div class="setgrid">
+    <section class="pform setcard">
+      <h3>학생 평가 입장</h3>
+      <p class="setstate"><span class="chip ${open ? 'ok' : 'warn'}">${open ? '진행 중' : '닫힘'}</span>
+        ${open ? '학생들이 입장 비밀번호로 들어와 평가할 수 있습니다.' : '학생은 평가 화면에 들어올 수 없습니다.'}</p>
+      <label class="ta"><span>${open ? '새 입장 비밀번호' : '입장 비밀번호'}</span>
+        <input type="text" id="setgate" value="" autocomplete="off" maxlength="50" placeholder="비밀번호 입력"></label>
+      <div class="pactions">
+        ${open ? '<button type="button" class="btn" data-act="close-eval">평가 종료 (입장 닫기)</button>' : ''}
+        <button type="button" class="btn primary" data-act="save-gate">${open ? '비밀번호 변경' : '평가 열기'}</button>
+      </div>
+    </section>
+    <section class="pform setcard">
+      <h3>피드백 공개</h3>
+      <p class="setstate"><span class="chip ${st.feedbackOpen ? 'ok' : ''}">${st.feedbackOpen ? '공개 중' : '비공개'}</span>
+        ${st.feedbackOpen ? '학생들이 "내 피드백 확인"에서 볼 수 있습니다.' : '학생에게 보이지 않습니다.'}</p>
+      <p class="muted setnote">공개하면 학생은 자신이 받은 <b>상호평가 서술형</b>만 볼 수 있습니다. 점수, 평가자 이름, 교수 평가, 자기평가는 공개되지 않습니다.</p>
+      <div class="pactions">
+        <button type="button" class="btn ${st.feedbackOpen ? '' : 'primary'}" data-act="toggle-feedback">${st.feedbackOpen ? '공개 중지' : '피드백 공개'}</button>
+      </div>
+    </section>
+  </div>`;
+}
+async function saveSettings(patch, msg){
+  let res = null;
+  const ok = await withBusy(async () => { const d = await api('saveSettings', Object.assign({ password: S.pw }, patch)); res = d.settings; });
+  if (!ok) return;
+  S.admin.settings = res;
+  if (S.pstatus) S.pstatus[S.project] = { evalOpen: !!res.gate, feedbackOpen: res.feedbackOpen };
+  render(); toast(msg);
 }
 
 function vUrls(){
@@ -445,8 +577,8 @@ async function enterStudent(mode){
   S.mode = mode;
   const ok = await withBusy(loadRoster);
   if (!ok) return;
-  if (!S.me || !S.sid || !S.students.some(s => s.name === S.me)) return go('who');
-  afterMe();
+  setStudent(null, null);
+  go('who');
 }
 function setStudent(name, sid){
   S.me = name; S.sid = sid;
@@ -518,8 +650,7 @@ const actions = {
   },
   enter(){ doEnter(); },
   async 'fb-start'(){
-    S.project = null; S.gate = null;
-    if (S.fb) return go('feedback');
+    S.project = null; S.gate = null; S.fb = null;
     const ok = await withBusy(async () => { const d = await api('fbRoster'); S.students = d.students; });
     if (ok) go('fbWho');
   },
@@ -537,11 +668,7 @@ const actions = {
   async role(el){
     const r = el.dataset.role;
     if (r === 'admin'){
-      if (S.pw){
-        const ok = await withBusy(loadAdmin);
-        if (ok) return go('admin', { tab: 'result', pform: null, urlDraft: null });
-        S.pw = null; store.set('xr_pw', null);
-      }
+      S.pw = null; S.admin = null;
       return go('login');
     }
     enterStudent(r);
@@ -562,6 +689,10 @@ const actions = {
   async 'submit-peer'(){
     const miss = S.form.scores.findIndex(x => !x);
     if (miss >= 0) return toast(`${miss + 1}번 문항의 점수를 선택하세요.`, 'err');
+    if (proj().rubric.peerTextRequired){
+      const empty = S.form.texts.findIndex(t => t.trim().length < 10);
+      if (empty >= 0) return toast(`서술형 ${empty + 1}번 문항을 10자 이상 작성하세요.`, 'err');
+    }
     const ok = await withBusy(() => api('submitPeer', { evaluator: S.me, sid: S.sid, target: S.target, scores: S.form.scores, texts: S.form.texts }));
     if (!ok) return;
     if (!S.status.peerDone.includes(S.target)) S.status.peerDone.push(S.target);
@@ -592,7 +723,7 @@ const actions = {
     for (let i = 0; i < R.prof.length; i++){
       const x = Number(f.scores[i]);
       if (f.scores[i] === '' || !isFinite(x) || x < 0 || x > R.prof[i].max)
-        return toast(`${R.prof[i].label}: 0~${R.prof[i].max} 사이로 입력하세요.`, 'err');
+        return toast(`${R.prof[i].label} 점수를 입력하세요.`, 'err');
     }
     const ok = await withBusy(async () => { await api('saveProf', { password: S.pw, name: f.name, scores: f.scores.map(Number), comment: f.comment }); await loadAdmin(); });
     if (!ok) return;
@@ -603,6 +734,20 @@ const actions = {
       else selectProf(f.name);
     } else selectProf(f.name);
     render();
+  },
+  'save-gate'(){
+    const g = document.getElementById('setgate').value.trim();
+    if (!g) return toast('입장 비밀번호를 입력하세요.', 'err');
+    saveSettings({ entryPw: g }, '평가 입장 비밀번호를 저장했습니다.');
+  },
+  'close-eval'(){
+    if (!confirm('평가를 종료할까요? 학생은 더 이상 평가 화면에 들어올 수 없습니다.')) return;
+    saveSettings({ entryPw: '' }, '평가를 종료했습니다.');
+  },
+  'toggle-feedback'(){
+    const on = !(S.admin.settings && S.admin.settings.feedbackOpen);
+    if (on && !confirm('학생들에게 상호평가 서술형 피드백을 공개할까요?')) return;
+    saveSettings({ feedbackOpen: on }, on ? '피드백을 공개했습니다.' : '피드백 공개를 중지했습니다.');
   },
   async 'save-urls'(){
     const bad = Object.entries(S.urlDraft).find(([, u]) => u.trim() && !safeUrl(u.trim()));
@@ -625,8 +770,7 @@ document.addEventListener('input', ev => {
   if (t.dataset.t != null && S.form){ S.form.texts[+t.dataset.t] = t.value; }
   else if (t.dataset.pi != null && S.pform){
     S.pform.scores[+t.dataset.pi] = t.value;
-    const max = +t.max, x = Number(t.value);
-    t.classList.toggle('bad', t.value !== '' && (!isFinite(x) || x < 0 || x > max));
+    updateSlider(+t.dataset.pi);
     const s = document.getElementById('psum'); if (s) s.textContent = r2(S.pform.scores.reduce((a, v) => a + (Number(v) || 0), 0));
   }
   else if (t.id === 'pcomment' && S.pform){ S.pform.comment = t.value; }
