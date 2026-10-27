@@ -288,7 +288,7 @@ function vAuth(){
 
 /* ---------- 화면: 상호평가 목록 ---------- */
 function vPeerList(){
-  const others = S.students.filter(s => s.name !== S.me);
+  const others = S.students.filter(s => s.name !== S.me && !s.out);
   const done = new Set(S.status.peerDone);
   const n = others.filter(s => done.has(s.name)).length;
   return topbar('상호평가', 'hub') + `<section class="page">
@@ -352,10 +352,10 @@ function vLogin(){
 
 /* ---------- 집계 ---------- */
 function compute(){
-  const R = proj().rubric, D = S.admin, W = R.weights;
+  const R = proj().rubric, D = S.admin, W = R.weights, EX = D.exclusions || {};
   return D.students.map(s => {
     const pr = D.prof.find(x => x.name === s.name);
-    const peers = D.peer.filter(x => x.target === s.name);
+    const peers = D.peer.filter(x => x.target === s.name && EX[x.evaluator] !== '결석');
     const sf = D.self.find(x => x.name === s.name);
     const profT = pr ? pr.total : null;
     const peerAvg = peers.length ? peers.reduce((a, x) => a + x.total, 0) / peers.length : null;
@@ -364,14 +364,15 @@ function compute(){
     const cQ = (peerAvg || 0) / R.peerMax * 100 * W.peer;
     const cS = (selfT || 0) / R.selfMax * 100 * W.self;
     const missing = [profT == null && '교수', peerAvg == null && '상호', selfT == null && '자기'].filter(Boolean);
-    return { name: s.name, sid: s.sid || '', url: s.url, pr, peers, sf, profT, peerAvg, peerN: peers.length, selfT, cP, cQ, cS, final: cP + cQ + cS, missing };
+    const ex = EX[s.name] || '';
+    return { name: s.name, sid: s.sid || '', url: s.url, ex, pr, peers, sf, profT, peerAvg, peerN: peers.length, selfT, cP, cQ, cS, final: ex ? null : cP + cQ + cS, missing };
   });
 }
 
 /* ---------- 화면: 교수 ---------- */
 function vAdmin(){
-  const tabs = [['result','결과'],['prof','교수 평가'],['urls','배포 주소'],['status','제출 현황'],['settings','공개 설정']];
-  const body = { result: vResult, prof: vProf, urls: vUrls, status: vStatus, settings: vSettings }[S.tab]();
+  const tabs = [['result','결과'],['prof','교수 평가'],['exclude','평가 제외'],['urls','배포 주소'],['status','제출 현황'],['settings','공개 설정']];
+  const body = { result: vResult, prof: vProf, exclude: vExclude, urls: vUrls, status: vStatus, settings: vSettings }[S.tab]();
   return topbar('교수 전용', 'hub', `<button type="button" class="btn sm" data-act="refresh">새로고침</button><button type="button" class="btn primary sm" data-act="download">엑셀 다운로드</button><button type="button" class="btn sm" data-act="logout">로그아웃</button>`)
     + `<section class="page wide">
       <nav class="tabs" role="tablist">${tabs.map(([k, l]) => `<button type="button" class="tab" role="tab" aria-selected="${S.tab === k}" data-act="tab" data-tab="${k}">${l}</button>`).join('')}</nav>
@@ -380,18 +381,27 @@ function vAdmin(){
 }
 
 function vResult(){
-  const rows = compute(), n = rows.length, D = S.admin;
-  const sorted = S.sort === 'final' ? rows.slice().sort((a, b) => b.final - a.final) : rows;
+  const rows = compute(), D = S.admin, EX = D.exclusions || {};
+  const inc = rows.filter(r => !r.ex), n = inc.length, incSet = new Set(inc.map(r => r.name));
+  const evaluators = rows.filter(r => r.ex !== '결석');
+  const peerExpected = evaluators.reduce((a, r) => a + inc.filter(t => t.name !== r.name).length, 0);
+  const peerGot = D.peer.filter(p => incSet.has(p.target) && EX[p.evaluator] !== '결석').length;
+  const sorted = S.sort === 'final' ? rows.slice().sort((a, b) => (b.final ?? -1) - (a.final ?? -1)) : rows;
+  const exN = rows.length - n;
   return `<div class="stats">
-      <div class="stat"><b>${D.prof.length} / ${n}</b><span>교수 평가 입력</span></div>
-      <div class="stat"><b>${D.peer.length} / ${n * (n - 1)}</b><span>상호평가 제출 건수</span></div>
-      <div class="stat"><b>${D.self.length} / ${n}</b><span>자기평가 제출</span></div>
+      <div class="stat"><b>${D.prof.filter(p => incSet.has(p.name)).length} / ${n}</b><span>교수 평가 입력</span></div>
+      <div class="stat"><b>${peerGot} / ${peerExpected}</b><span>상호평가 제출 건수</span></div>
+      <div class="stat"><b>${D.self.filter(x => incSet.has(x.name)).length} / ${n}</b><span>자기평가 제출</span></div>
+      ${exN ? `<div class="stat"><b>${exN}명</b><span>평가 제외 (결석·미제출)</span></div>` : ''}
     </div>
     <div class="tools"><p class="muted" style="margin:0">학생 이름을 누르면 문항별 점수와 서술형 응답을 볼 수 있습니다.</p>
       <select data-act-change="sort" aria-label="정렬"><option value="name" ${S.sort === 'name' ? 'selected' : ''}>명단순</option><option value="final" ${S.sort === 'final' ? 'selected' : ''}>최종 점수순</option></select></div>
     <div class="tablewrap"><table>
       <thead><tr><th>이름</th><th>교수 평가<br>(100)</th><th>상호평가 평균<br>(25)</th><th>평가 인원</th><th>자기평가<br>(25)</th><th>교수 반영<br>(70)</th><th>상호 반영<br>(20)</th><th>자기 반영<br>(10)</th><th>최종<br>(100)</th><th>누락</th></tr></thead>
-      <tbody>${sorted.map(r => `<tr class="click" data-act="detail" data-name="${esc(r.name)}">
+      <tbody>${sorted.map(r => r.ex ? `<tr class="click excluded" data-act="detail" data-name="${esc(r.name)}">
+        <td><strong>${esc(r.name)}</strong></td><td colspan="8" class="left"><span class="dash">평가 제외</span></td>
+        <td><span class="chip ex">${esc(r.ex)}</span></td></tr>`
+      : `<tr class="click" data-act="detail" data-name="${esc(r.name)}">
         <td><strong>${esc(r.name)}</strong></td><td>${fmt(r.profT)}</td><td>${fmt(r.peerAvg)}</td><td>${r.peerN}명</td><td>${fmt(r.selfT)}</td>
         <td>${fmt(r.cP)}</td><td>${fmt(r.cQ)}</td><td>${fmt(r.cS)}</td><td class="final">${fmt(r.final)}</td>
         <td>${r.missing.length ? `<span class="chip warn">${r.missing.join(', ')}</span>` : '<span class="chip ok">완료</span>'}</td></tr>`).join('')}</tbody>
@@ -405,6 +415,7 @@ function vDetail(){
   const comments = r.peers.filter(p => p.good || p.improve);
   return `<div class="overlay" data-act="close-detail"><aside class="drawer" role="dialog" aria-label="${esc(r.name)} 상세" data-stop>
     <header><h2>${esc(r.name)}</h2><button type="button" class="btn sm" data-act="close-detail">닫기</button></header>
+    ${r.ex ? `<p class="note" style="margin:0 0 14px">이번 프로젝트 평가에서 제외된 학생입니다 (${esc(r.ex)}). 최종 점수를 계산하지 않습니다.</p>` : ''}
     <section><h4>최종 ${fmt(r.final)}점</h4><div class="kv">
       <span>교수 평가 × 70%</span><span>${fmt(r.cP)}</span><span>상호평가 × 20%</span><span>${fmt(r.cQ)}</span><span>자기평가 × 10%</span><span>${fmt(r.cS)}</span></div>
       <p style="margin:10px 0 0">${playLink(r.url, '게임 열기')}</p></section>
@@ -421,9 +432,10 @@ function vProf(){
   if (!S.pform) selectProf(D.students[0] && D.students[0].name);
   const f = S.pform, total = f.scores.reduce((a, x) => a + (Number(x) || 0), 0);
   return `<div class="profgrid">
-    <div class="plist">${D.students.map(s => { const p = D.prof.find(x => x.name === s.name); return `<button type="button" class="pitem" aria-current="${f.name === s.name}" data-act="prof-sel" data-name="${esc(s.name)}"><span>${esc(s.name)}</span>${p ? `<small>${r2(p.total)}</small>` : ''}</button>`; }).join('')}</div>
+    <div class="plist">${D.students.map(s => { const p = D.prof.find(x => x.name === s.name); const ex = (D.exclusions || {})[s.name]; return `<button type="button" class="pitem ${ex ? 'excluded' : ''}" aria-current="${f.name === s.name}" data-act="prof-sel" data-name="${esc(s.name)}"><span>${esc(s.name)}</span>${ex ? `<span class="chip ex">${esc(ex)}</span>` : p ? `<small>${r2(p.total)}</small>` : ''}</button>`; }).join('')}</div>
     <div class="pform">
       <h3>${esc(f.name)}</h3>
+      ${(D.exclusions || {})[f.name] ? `<p class="note" style="margin:6px 0 10px">평가 제외(${esc(D.exclusions[f.name])}) 학생입니다. 점수를 입력해도 최종 점수는 계산하지 않습니다.</p>` : ''}
       <p style="margin:0 0 8px">${playLink((D.students.find(s => s.name === f.name) || {}).url, '게임 열기')}</p>
       ${R.prof.map((p, i) => sliderRow(p, i, f.scores[i])).join('')}
       <div class="total">합계 <b id="psum">${r2(total)}</b> / 100</div>
@@ -480,6 +492,33 @@ function selectProf(name){
   S.pform = { name, scores: p ? p.scores.map(String) : proj().rubric.prof.map(() => ''), comment: p ? p.comment : '' };
 }
 
+/* ---------- 교수: 평가 제외 ---------- */
+const EX_OPTIONS = [['', '평가 대상'], ['결석', '결석'], ['미제출', '미제출']];
+function vExclude(){
+  if (!S.exDraft) S.exDraft = Object.assign({}, S.admin.exclusions || {});
+  const D = S.admin, saved = D.exclusions || {};
+  const changed = D.students.some(s => (S.exDraft[s.name] || '') !== (saved[s.name] || ''));
+  const cnt = k => D.students.filter(s => (S.exDraft[s.name] || '') === k).length;
+  return `<div class="exhead">
+      <p class="muted" style="margin:0">결석하거나 프로젝트를 제출하지 않은 학생을 표시하면 평가에서 제외됩니다.</p>
+      <ul class="exrules">
+        <li><b>결석</b>: 다른 학생의 상호평가 목록에서 빠지고, 본인도 상호평가·자기평가를 할 수 없습니다.</li>
+        <li><b>미제출</b>: 상호평가 목록에서 빠지고 자기평가는 할 수 없지만, 다른 학생 상호평가는 할 수 있습니다.</li>
+        <li>제외된 학생은 최종 점수를 계산하지 않으며, 엑셀에 제외 사유가 표시됩니다.</li>
+      </ul>
+    </div>
+    <div class="pform">
+      <p class="excount">평가 대상 <b>${cnt('')}명</b> · 결석 <b>${cnt('결석')}명</b> · 미제출 <b>${cnt('미제출')}명</b></p>
+      ${D.students.map(s => { const cur = S.exDraft[s.name] || ''; return `<div class="exrow ${cur ? 'is-out' : ''}">
+        <strong>${esc(s.name)}</strong>
+        <div class="seg" role="radiogroup" aria-label="${esc(s.name)} 평가 구분">${EX_OPTIONS.map(([v, l]) =>
+          `<button type="button" role="radio" aria-checked="${cur === v}" class="segbtn ${cur === v ? 'on' : ''} ${v ? 'out' : ''}" data-act="ex-set" data-name="${esc(s.name)}" data-v="${v}">${l}</button>`).join('')}</div>
+      </div>`; }).join('')}
+      <div class="pactions">${changed ? '<span class="muted" style="align-self:center">저장하지 않은 변경 사항이 있습니다</span><button type="button" class="btn" data-act="ex-reset">되돌리기</button>' : ''}
+        <button type="button" class="btn primary" data-act="ex-save" ${changed ? '' : 'disabled'}>저장</button></div>
+    </div>`;
+}
+
 /* ---------- 교수: 공개 설정 ---------- */
 function vSettings(){
   const st = S.admin.settings || { gate: '', feedbackOpen: false };
@@ -526,17 +565,21 @@ function vUrls(){
 }
 
 function vStatus(){
-  const D = S.admin, n = D.students.length;
+  const D = S.admin, EX = D.exclusions || {};
+  const targets = D.students.filter(s => !EX[s.name]);
   return `<div class="tablewrap"><table>
     <thead><tr><th>이름</th><th>상호평가 제출</th><th>받은 상호평가</th><th>자기평가</th><th style="text-align:left">아직 평가하지 않은 대상</th></tr></thead>
     <tbody>${D.students.map(s => {
-      const given = D.peer.filter(p => p.evaluator === s.name).map(p => p.target);
+      const ex = EX[s.name];
+      const mine = targets.filter(o => o.name !== s.name);
+      const given = D.peer.filter(p => p.evaluator === s.name && !EX[p.target]).map(p => p.target);
       const recv = D.peer.filter(p => p.target === s.name).length;
-      const left = D.students.filter(o => o.name !== s.name && !given.includes(o.name)).map(o => o.name);
       const selfOk = D.self.some(x => x.name === s.name);
-      return `<tr><td><strong>${esc(s.name)}</strong></td>
-        <td><span class="chip ${given.length === n - 1 ? 'ok' : ''}">${given.length} / ${n - 1}</span></td>
-        <td>${recv}명</td><td>${selfOk ? '<span class="chip ok">제출</span>' : '<span class="chip warn">미제출</span>'}</td>
+      if (ex === '결석') return `<tr class="excluded"><td><strong>${esc(s.name)}</strong></td><td colspan="4" class="left"><span class="chip ex">결석</span> <span class="dash">평가 대상이 아니며 상호평가도 하지 않습니다</span></td></tr>`;
+      const left = mine.filter(o => !given.includes(o.name)).map(o => o.name);
+      return `<tr class="${ex ? 'excluded' : ''}"><td><strong>${esc(s.name)}</strong>${ex ? ` <span class="chip ex">${esc(ex)}</span>` : ''}</td>
+        <td><span class="chip ${given.length === mine.length ? 'ok' : ''}">${given.length} / ${mine.length}</span></td>
+        <td>${ex ? '<span class="dash">-</span>' : recv + '명'}</td><td>${ex ? '<span class="dash">-</span>' : selfOk ? '<span class="chip ok">제출</span>' : '<span class="chip warn">미제출</span>'}</td>
         <td class="left">${left.length ? esc(left.join(', ')) : '<span class="dash">없음</span>'}</td></tr>`; }).join('')}</tbody>
   </table></div>`;
 }
@@ -549,9 +592,11 @@ function downloadXlsx(){
   const add = (aoa, name, widths) => { const ws = XLSX.utils.aoa_to_sheet(aoa); ws['!cols'] = widths.map(w => ({ wch: w })); XLSX.utils.book_append_sheet(wb, ws, name); };
   const nz = x => x == null ? '' : r2(x);
 
-  add([['학번','이름','교수 평가(100)','상호평가 평균(25)','상호평가 인원','자기평가(25)','교수 반영(70%)','상호 반영(20%)','자기 반영(10%)','최종 점수(100)','누락','배포 주소']]
-    .concat(rows.map(r => [r.sid, r.name, nz(r.profT), nz(r.peerAvg), r.peerN, nz(r.selfT), r2(r.cP), r2(r.cQ), r2(r.cS), r2(r.final), r.missing.join(', '), r.url])),
-    '최종결과', [12,22,14,16,12,13,14,14,14,14,14,40]);
+  add([['학번','이름','평가 제외','교수 평가(100)','상호평가 평균(25)','상호평가 인원','자기평가(25)','교수 반영(70%)','상호 반영(20%)','자기 반영(10%)','최종 점수(100)','누락','배포 주소']]
+    .concat(rows.map(r => r.ex
+      ? [r.sid, r.name, r.ex, '', '', '', '', '', '', '', '', '', r.url]
+      : [r.sid, r.name, '', nz(r.profT), nz(r.peerAvg), r.peerN, nz(r.selfT), r2(r.cP), r2(r.cQ), r2(r.cS), r2(r.final), r.missing.join(', '), r.url])),
+    '최종결과', [12,22,10,14,16,12,13,14,14,14,14,14,40]);
 
   add([['이름'].concat(R.prof.map(p => `${p.label}(${p.max})`), ['합계(100)','코멘트','수정일시'])]
     .concat(D.students.map(s => { const p = D.prof.find(x => x.name === s.name); return p ? [s.name].concat(p.scores, [p.total, p.comment, p.time]) : [s.name]; })),
@@ -619,6 +664,10 @@ async function doStudentLogin(){
   let status = null;
   const ok = await withBusy(async () => { const d = await api('studentLogin', { name: S.pick, sid }); status = d.status; });
   if (!ok){ const el = document.getElementById('sid'); if (el){ el.value = ''; el.focus(); } return; }
+  if (status.excluded === '결석' || (S.mode === 'self' && status.excluded)){
+    toast(S.mode === 'self' ? '이번 프로젝트 평가에서 제외되어 자기평가를 할 수 없습니다.' : '결석으로 이번 프로젝트 평가에서 제외되어 상호평가를 할 수 없습니다.', 'err');
+    return go('hub');
+  }
   setStudent(S.pick, sid); S.status = status;
   if (S.mode === 'peer') go('peerList');
   else { const R = proj().rubric; S.form = { scores: R.selfScale.map(() => 0), texts: R.selfText.map(() => '') }; go('selfForm'); }
@@ -629,7 +678,7 @@ async function doLogin(){
   if (!pw) return toast('비밀번호를 입력하세요.', 'err');
   S.pw = pw;
   const ok = await withBusy(loadAdmin);
-  if (ok){ store.set('xr_pw', pw); go('admin', { tab: 'result', pform: null, urlDraft: null, detail: null }); }
+  if (ok){ store.set('xr_pw', pw); go('admin', { tab: 'result', pform: null, urlDraft: null, detail: null, exDraft: null }); }
   else { S.pw = null; store.set('xr_pw', null); }
 }
 
@@ -637,7 +686,7 @@ const actions = {
   async project(el){
     const p = PROJECTS.find(x => x.id === el.dataset.id);
     if (!p.open) return toast(`${p.title} 평가는 아직 열리지 않았습니다.`);
-    const reset = { project: p.id, gate: null, students: [], status: null, admin: null, pform: null, urlDraft: null, detail: null };
+    const reset = { project: p.id, gate: null, students: [], status: null, admin: null, pform: null, urlDraft: null, detail: null, exDraft: null };
     Object.assign(S, reset);
     const saved = store.get('xr_gate_' + p.id);
     if (saved){
@@ -712,8 +761,8 @@ const actions = {
   },
   login(){ doLogin(); },
   logout(){ S.pw = null; S.admin = null; store.set('xr_pw', null); go('hub'); },
-  tab(el){ S.tab = el.dataset.tab; S.detail = null; render(); },
-  async refresh(){ const ok = await withBusy(loadAdmin); if (ok){ S.urlDraft = null; if (S.pform) selectProf(S.pform.name); render(); toast('최신 데이터를 불러왔습니다.'); } },
+  tab(el){ S.tab = el.dataset.tab; S.detail = null; S.exDraft = null; render(); },
+  async refresh(){ const ok = await withBusy(loadAdmin); if (ok){ S.urlDraft = null; S.exDraft = null; if (S.pform) selectProf(S.pform.name); render(); toast('최신 데이터를 불러왔습니다.'); } },
   download(){ downloadXlsx(); },
   detail(el){ S.detail = el.dataset.name; render(); },
   'close-detail'(el, ev){ if (ev.target.closest('[data-stop]') && !ev.target.closest('.btn')) return; S.detail = null; render(); },
@@ -734,6 +783,18 @@ const actions = {
       else selectProf(f.name);
     } else selectProf(f.name);
     render();
+  },
+  'ex-set'(el){
+    const n = el.dataset.name, v = el.dataset.v;
+    if (v) S.exDraft[n] = v; else delete S.exDraft[n];
+    render();
+  },
+  'ex-reset'(){ S.exDraft = null; render(); },
+  async 'ex-save'(){
+    const list = Object.assign({}, S.exDraft);
+    const ok = await withBusy(async () => { await api('saveExclusions', { password: S.pw, list }); await loadAdmin(); });
+    if (!ok) return;
+    S.exDraft = null; render(); toast('평가 제외 학생을 저장했습니다.');
   },
   'save-gate'(){
     const g = document.getElementById('setgate').value.trim();
